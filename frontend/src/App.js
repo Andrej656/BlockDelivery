@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import Web3Modal from "web3modal";
-import "./App.css"; // Add this line for CSS styling
+import "./App.css"; // Ensure this file is added for styling
 
-const marketplaceAddress = "Your_Contract_Address";  // Replace with your deployed contract address
-const marketplaceABI = [ /* Paste ABI here after deployment */ ];
+// Replace with your contract's deployed address and ABI
+const marketplaceAddress = "Your_Contract_Address"; // Replace with your deployed contract address
+const marketplaceABI = [ /* Your contract ABI here */ ];
 
 function App() {
   const [provider, setProvider] = useState(null);
   const [contract, setContract] = useState(null);
   const [account, setAccount] = useState(null);
+  const [products, setProducts] = useState([]);
 
-  // State for form inputs
+  // Form input states
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
 
-  // Connect wallet
+  // Connect wallet and load blockchain data
   const loadBlockchainData = async () => {
     const web3Modal = new Web3Modal();
     const connection = await web3Modal.connect();
@@ -29,6 +31,15 @@ function App() {
 
     const contract = new ethers.Contract(marketplaceAddress, marketplaceABI, signer);
     setContract(contract);
+
+    // Fetch existing products from the contract
+    const productCount = await contract.productCount();
+    let loadedProducts = [];
+    for (let i = 1; i <= productCount; i++) {
+      const product = await contract.products(i);
+      loadedProducts.push(product);
+    }
+    setProducts(loadedProducts);
   };
 
   // Create product function
@@ -44,10 +55,11 @@ function App() {
     await transaction.wait();
     alert("Product listed successfully!");
 
-    // Clear the form
+    // Clear the form and reload the product list
     setName("");
     setDescription("");
     setPrice("");
+    loadBlockchainData(); // Reload product data after listing
   };
 
   useEffect(() => {
@@ -56,29 +68,53 @@ function App() {
 
   return (
     <div className="App">
-      <h1>BlockDelivery Marketplace</h1>
-      {account ? <p>Connected as {account}</p> : <button onClick={loadBlockchainData}>Connect Wallet</button>}
+      <header>
+        <h1>BlockDelivery Marketplace</h1>
+        {account ? <p>Connected as {account}</p> : <button onClick={loadBlockchainData}>Connect Wallet</button>}
+      </header>
 
       <form onSubmit={createProduct}>
+        <h2>List a New Product</h2>
         <input
           type="text"
           placeholder="Product Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          required
         />
         <textarea
           placeholder="Product Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          required
         />
         <input
           type="number"
           placeholder="Product Price (ETH)"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
+          required
+          min="0"
+          step="0.0001"
         />
         <button type="submit">List Product</button>
       </form>
+
+      <h2>Available Products</h2>
+      <div className="product-list">
+        {products.length > 0 ? (
+          products.map((product, index) => (
+            <div key={index} className="product-item">
+              <h3>{product.name}</h3>
+              <p>{product.description}</p>
+              <p className="price">{ethers.utils.formatEther(product.price)} ETH</p>
+              <p className="status">{product.sold ? "Sold" : "Available"}</p>
+            </div>
+          ))
+        ) : (
+          <p>No products available.</p>
+        )}
+      </div>
     </div>
   );
 }
